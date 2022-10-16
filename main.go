@@ -1,58 +1,87 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
-	"github.com/bwmarrin/discordgo"
+	_ "github.com/mattn/go-sqlite3"
+	"log"
 	"os"
-	"os/signal"
-	"syscall"
 )
 
 var (
 	Token = "Bot " + os.Getenv("Discord-Bot-Token")
 )
 
-func main() {
-	dg, err := discordgo.New(Token)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	dg.AddHandler(messageCreate)
-	dg.Identify.Intents = discordgo.IntentsGuildMessages
-	err = dg.Open()
-	defer func(dg *discordgo.Session) {
-		err := dg.Close()
-		if err != nil {
-			return
-		}
-	}(dg)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
-	<-sc
+type todo struct {
+	id    string
+	name  string
+	level string
 }
 
-func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	fmt.Println("test")
-	fmt.Println(m.Content, m.Author.Username)
-	if m.Author.ID == s.State.User.ID {
+func main() {
+	td := new(todo)
+	fmt.Println("登録するデータを入力してください")
+	_, err := fmt.Scan(&td.id, &td.name, &td.level)
+	if err != nil {
+		fmt.Println(err)
 		return
 	}
-	if m.Content == "ping" {
-		_, err := s.ChannelMessageSend(m.ChannelID, "Pong!")
-		if err != nil {
-			return
-		}
+	//登録するユーザ情報
+
+	//データベースに情報を登録
+	err = saveData(td)
+	if err != nil {
+		fmt.Println(err)
 	}
-	if m.Content == "pong" {
-		_, err := s.ChannelMessageSend(m.ChannelID, "Ping!")
-		if err != nil {
-			return
-		}
+	fmt.Println("Succeeded to save your task")
+}
+
+func saveData(data *todo) error {
+	fmt.Println("Save data to DB")
+	db, err := sql.Open("sqlite3", "todo_database.db") //データベースに接続
+	if err != nil {
+		fmt.Println("open sql")
+		return err
 	}
+	defer func(db *sql.DB) {
+		err := db.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(db) //データベースの接続解除
+
+	todo, err := db.Prepare("CREATE TABLE IF NOT EXISTS todo (id text PRIMARY KEY, name text, level text)") //データベースの準備
+	if err != nil {
+		log.Println("prepare sql(create table)")
+		return err
+	}
+	defer func(todo *sql.Stmt) {
+		err := todo.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(todo) //データベースを閉じる
+	_, err = todo.Exec()
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	todo, err = db.Prepare("INSERT INTO todo (id, name, level) VALUES ($1, $2, $3)")
+	if err != nil {
+		log.Println("[-]sql.Prepare (INSERT INTO todo)")
+		return err
+	}
+	defer func(todo *sql.Stmt) {
+		err := todo.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(todo)
+
+	_, err = todo.Exec(data.id, data.name, data.level)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	return nil
 }
