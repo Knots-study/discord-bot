@@ -1,2 +1,3 @@
 # discord-bot
-discordのbotまとめ
+Todoリスト用のbot
+
