@@ -109,7 +109,7 @@ func operateData(order string, data *todo, s *discordgo.Session, m *discordgo.Me
 	switch order {
 
 	case "登録":
-		cmd = "INSERT INTO todo (id, name, level) VALUES (?, ?, ?)" //SQLインジェクション回避
+		cmd = "INSERT INTO todo (id, name, level) VALUES (?, ?, ?)" //SQLインジェクション回避用
 		_, err = db.Exec(cmd, data.id, data.name, data.level)
 		if err != nil {
 			fmt.Println("Fail to insert DB", err)
@@ -158,7 +158,6 @@ func operateData(order string, data *todo, s *discordgo.Session, m *discordgo.Me
 		if err != nil {
 			fmt.Println("表示するtodoリストがありません", err)
 		}
-
 	default:
 		s.ChannelMessageSend(m.ChannelID, "きちんとつぶやいてね!")
 	}
