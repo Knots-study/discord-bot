@@ -3,9 +3,12 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"github.com/bwmarrin/discordgo"
 	_ "github.com/mattn/go-sqlite3"
-	"log"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 )
 
 var (
@@ -18,70 +21,145 @@ type todo struct {
 	level string
 }
 
+var oldmessage = " "
+
 func main() {
-	td := new(todo)
-	fmt.Println("登録するデータを入力してください")
-	_, err := fmt.Scan(&td.id, &td.name, &td.level)
+	dg, err := discordgo.New(Token)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("error creating Discord session,", err)
+	}
+	dg.AddHandler(onMessageCreate)
+	dg.Identify.Intents = discordgo.IntentsGuildMessages
+	err = dg.Open()
+	if err != nil {
+		fmt.Println("error opening connection,", err)
 		return
 	}
-	//登録するユーザ情報
-
-	//データベースに情報を登録
-	err = saveData(td)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println("Succeeded to save your task")
+	defer func(dg *discordgo.Session) {
+		err := dg.Close()
+		if err != nil {
+			fmt.Println("error closing connection,", err)
+		}
+	}(dg)
+	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	<-sc
 }
 
-func saveData(data *todo) error {
-	fmt.Println("Save data to DB")
+func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+	if m.ChannelID != os.Getenv("Discord-Bot-Todo-ChannelID") { //チャンネル外での発言
+		return
+	}
+	if m.Author.ID == s.State.User.ID { //本人の発言
+		return
+	}
+	switch m.Content {
+	case "登録":
+		s.ChannelMessageSend(m.ChannelID, "登録したいタスクを言ってね\n例：2 部屋の掃除　9")
+	case "削除":
+		s.ChannelMessageSend(m.ChannelID, "削除したいidを言ってね")
+	case "更新":
+		s.ChannelMessageSend(m.ChannelID, "更新したいidを言ってね")
+	case "表示":
+		s.ChannelMessageSend(m.ChannelID, "タスクの一覧を表示するよ")
+	}
+
+	td := new(todo)
+	order := m.Content
+
+	switch oldmessage {
+	case "登録":
+		arr := strings.Split(order, " ")
+		td.id, td.name, td.level = arr[0], arr[1], arr[2]
+		operateData(oldmessage, td, s, m)
+	case "削除":
+		arr := strings.Split(order, " ")
+		td.id = arr[0]
+		operateData(oldmessage, td, s, m)
+	case "更新":
+		arr := strings.Split(order, " ")
+		td.id, td.level = arr[0], arr[1]
+		operateData(oldmessage, td, s, m)
+	case "表示":
+		operateData(oldmessage, td, s, m)
+	}
+	oldmessage = m.Content
+}
+
+func operateData(order string, data *todo, s *discordgo.Session, m *discordgo.MessageCreate) {
+	fmt.Println("Operate DB")
 	db, err := sql.Open("sqlite3", "todo_database.db") //データベースに接続
 	if err != nil {
-		fmt.Println("open sql")
-		return err
+		fmt.Println("Fail to open DB", err)
 	}
-	defer func(db *sql.DB) {
+	defer func(db *sql.DB) { //必ず閉じる
 		err := db.Close()
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Fail to close DB", err)
 		}
 	}(db) //データベースの接続解除
 
-	todo, err := db.Prepare("CREATE TABLE IF NOT EXISTS todo (id text PRIMARY KEY, name text, level text)") //データベースの準備
+	cmd := "CREATE TABLE IF NOT EXISTS todo (id text PRIMARY KEY, name text, level text)" //DBが存在しない場合，新たにCREATE
+	_, err = db.Exec(cmd)
 	if err != nil {
-		log.Println("prepare sql(create table)")
-		return err
+		fmt.Println("Fail to create DB", err)
 	}
-	defer func(todo *sql.Stmt) {
-		err := todo.Close()
+
+	switch order {
+
+	case "登録":
+		cmd = "INSERT INTO todo (id, name, level) VALUES (?, ?, ?)" //SQLインジェクション回避
+		_, err = db.Exec(cmd, data.id, data.name, data.level)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Fail to insert DB", err)
 		}
-	}(todo) //データベースを閉じる
-	_, err = todo.Exec()
-	if err != nil {
-		fmt.Println(err)
-	}
+		s.ChannelMessageSend(m.ChannelID, "登録したよ！")
 
-	todo, err = db.Prepare("INSERT INTO todo (id, name, level) VALUES ($1, $2, $3)")
-	if err != nil {
-		log.Println("[-]sql.Prepare (INSERT INTO todo)")
-		return err
-	}
-	defer func(todo *sql.Stmt) {
-		err := todo.Close()
+	case "削除":
+		cmd = "DELETE FROM todo WHERE id = ?"
+		_, err = db.Exec(cmd, data.id)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Fail to delete DB", err)
 		}
-	}(todo)
+		s.ChannelMessageSend(m.ChannelID, "削除したよ")
 
-	_, err = todo.Exec(data.id, data.name, data.level)
-	if err != nil {
-		fmt.Println(err)
+	case "更新":
+		cmd = "UPDATE todo SET level = ? WHERE id = ?"
+		_, err = db.Exec(cmd, data.level, data.id)
+		if err != nil {
+			fmt.Println("Fail to update DB", err)
+		}
+		s.ChannelMessageSend(m.ChannelID, "更新したよ")
+
+	case "表示":
+		cmd = "SELECT * FROM todo"
+		rows, err := db.Query(cmd) //複数の検索結果を取得するため，Query
+		if err != nil {
+			fmt.Println("Fail to select DB", err)
+		}
+		defer func(rows *sql.Rows) { //絶対に閉じる
+			err := rows.Close()
+			if err != nil {
+				fmt.Println("Fail to close selecting DB", err)
+			}
+		}(rows)
+		var td todo
+		s.ChannelMessageSend(m.ChannelID, "現状のタスク一覧を表示します")
+		for rows.Next() {
+			err := rows.Scan(&td.id, &td.name, &td.level)
+			if err != nil {
+				fmt.Println(err)
+			}
+			comment := "ID: " + td.id + " タスク名: " + td.name + " 優先度: " + td.level
+			s.ChannelMessageSend(m.ChannelID, comment)
+		}
+		err = rows.Err()
+		if err != nil {
+			fmt.Println("表示するtodoリストがありません", err)
+		}
+
+	default:
+		s.ChannelMessageSend(m.ChannelID, "きちんとつぶやいてね!")
 	}
-
-	return nil
 }
