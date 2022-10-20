@@ -54,6 +54,10 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID { //本人の発言
 		return
 	}
+
+	td := new(todo)
+	order := m.Content
+
 	switch m.Content {
 	case "登録":
 		s.ChannelMessageSend(m.ChannelID, "登録したいタスクを言ってね\n例：2 部屋の掃除　9")
@@ -63,10 +67,8 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		s.ChannelMessageSend(m.ChannelID, "更新したいidを言ってね")
 	case "表示":
 		s.ChannelMessageSend(m.ChannelID, "タスクの一覧を表示するよ")
+		operateData(m.Content, td, s, m)
 	}
-
-	td := new(todo)
-	order := m.Content
 
 	switch oldmessage {
 	case "登録":
@@ -80,8 +82,6 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	case "更新":
 		arr := strings.Split(order, " ")
 		td.id, td.level = arr[0], arr[1]
-		operateData(oldmessage, td, s, m)
-	case "表示":
 		operateData(oldmessage, td, s, m)
 	}
 	oldmessage = m.Content
@@ -113,8 +113,10 @@ func operateData(order string, data *todo, s *discordgo.Session, m *discordgo.Me
 		_, err = db.Exec(cmd, data.id, data.name, data.level)
 		if err != nil {
 			fmt.Println("Fail to insert DB", err)
+			s.ChannelMessageSend(m.ChannelID, "idが重複しています")
+		} else {
+			s.ChannelMessageSend(m.ChannelID, "登録したよ！")
 		}
-		s.ChannelMessageSend(m.ChannelID, "登録したよ！")
 
 	case "削除":
 		cmd = "DELETE FROM todo WHERE id = ?"
