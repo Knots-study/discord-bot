@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	//. "github.com/Knots-study/discord-bot/_package/"
 )
 
 var (
