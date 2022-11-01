@@ -14,12 +14,7 @@ type Dashboard struct {
 	messageID   string
 }
 
-func main() {
-	fmt.Println("aiueo")
-
-}
-
-func makeDashboard(session *discordgo.Session, message *discordgo.MessageCreate, title string, description string) *Dashboard {
+func MakeDashboard(session *discordgo.Session, message *discordgo.MessageCreate, title string, description string) *Dashboard {
 	ds := new(Dashboard)
 	ds.title = title
 	ds.description = description
@@ -28,7 +23,7 @@ func makeDashboard(session *discordgo.Session, message *discordgo.MessageCreate,
 	return ds
 }
 
-func (ds *Dashboard) reload() {
+func (ds *Dashboard) Reload() {
 	embed := discordgo.MessageEmbed{
 		Type:        discordgo.EmbedType("rich"),
 		Title:       ds.title,

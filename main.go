@@ -7,9 +7,9 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
-	//. "github.com/Knots-study/discord-bot/_package/"
 )
 
 var (
@@ -30,6 +30,7 @@ func main() {
 		fmt.Println("error creating Discord session,", err)
 	}
 	dg.AddHandler(onMessageCreate)
+
 	dg.Identify.Intents = discordgo.IntentsGuildMessages
 	err = dg.Open()
 	if err != nil {
@@ -148,19 +149,31 @@ func operateData(order string, data *todo, s *discordgo.Session, m *discordgo.Me
 			}
 		}(rows)
 		var td todo
-		s.ChannelMessageSend(m.ChannelID, "現状のタスク一覧を表示します")
+		comment := ""
+		count := 1
 		for rows.Next() {
 			err := rows.Scan(&td.id, &td.name, &td.level)
 			if err != nil {
 				fmt.Println(err)
 			}
-			comment := "ID: " + td.id + " タスク名: " + td.name + " 優先度: " + td.level
-			s.ChannelMessageSend(m.ChannelID, comment)
+			comment += "ID: " + strconv.Itoa(count) + " タスク名: " + td.name + " 優先度: " + td.level + "\n"
+			count += 1
 		}
-		err = rows.Err()
+		embed := discordgo.MessageEmbed{Title: "ToDoリスト", Description: comment, Color: 1752220}
+		message, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 		if err != nil {
-			fmt.Println("表示するtodoリストがありません", err)
+			s.ChannelMessageSend(m.ChannelID, "error")
 		}
+		fmt.Println(count - 1)
+		_ = s.MessageReactionAdd(m.ChannelID, message.ID, "1⃣")
+		_ = s.MessageReactionAdd(m.ChannelID, message.ID, "2⃣")
+		_ = s.MessageReactionAdd(m.ChannelID, message.ID, "3⃣")
+		_ = s.MessageReactionAdd(m.ChannelID, message.ID, "4⃣")
+		_ = s.MessageReactionAdd(m.ChannelID, message.ID, "5⃣")
+		_ = s.MessageReactionAdd(m.ChannelID, message.ID, "6⃣")
+		_ = s.MessageReactionAdd(m.ChannelID, message.ID, "7⃣")
+		_ = s.MessageReactionAdd(m.ChannelID, message.ID, "8⃣")
+		_ = s.MessageReactionAdd(m.ChannelID, message.ID, "9⃣")
 	default:
 		s.ChannelMessageSend(m.ChannelID, "きちんとつぶやいてね!")
 	}
