@@ -1,28 +1,22 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
+	. "github.com/Knots-study/discord-bot/_package"
 	"github.com/bwmarrin/discordgo"
 	_ "github.com/mattn/go-sqlite3"
 	"os"
 	"os/signal"
-	"strconv"
+	"strings"
 	"syscall"
 )
 
 var (
-	Token = "Bot " + os.Getenv("Discord-Bot-Token")
+	Token          = "Bot " + os.Getenv("Discord-Bot-Token")
+	Bot_Message_ID = ""
+	emojis         = InitEmojis()
+	flag_new       = 0
 )
-
-type todo struct {
-	id    string
-	name  string
-	level string
-}
-
-var oldmessage = " "
-var Bot_Message_ID = ""
 
 func main() {
 	dg, err := discordgo.New(Token)
@@ -30,7 +24,6 @@ func main() {
 		fmt.Println("error creating Discord session,", err)
 	}
 
-	Emojis.InitEmojis()
 	dg.AddHandler(onMessageCreate)
 	dg.AddHandler(messageReactionAdd)
 
@@ -60,60 +53,34 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", "todo_database.db") //データベースに接続
-	if err != nil {
-		fmt.Println("Fail to open DB", err)
-	}
-	defer func(db *sql.DB) { //必ず閉じる
-		err := db.Close()
-		if err != nil {
-			fmt.Println("Fail to close DB", err)
-		}
-	}(db) //データベースの接続解除
+	db := OpenDB()    //DBを起動
+	defer CloseDB(db) //DBは必ず閉じる
 
-	cmd := "CREATE TABLE IF NOT EXISTS todo (id text PRIMARY KEY, name text, level text)" //DBが存在しない場合，新たにCREATE
-	_, err = db.Exec(cmd)
-	if err != nil {
-		fmt.Println("Fail to create DB", err)
+	CreateDB() //起動時にDBのテーブルが未作成の場合，作成する
+
+	if flag_new == 1 { //Newボタンが押された時のみ，値を追加する
+		arr := strings.Split(m.Content, " ")
+		if len(arr) != 2 {
+			s.ChannelMessageSend(m.ChannelID, "きちんと入力してください")
+			s.ChannelMessageSend(m.ChannelID, "登録したいタスクを言ってね(例:部屋の掃除 9)")
+			return
+		}
+		InsertDB(arr, db)
+		flag_new = 0
 	}
 
-	cmd = "SELECT * FROM todo"
-	rows, err := db.Query(cmd) //複数の検索結果を取得するため，Query
-	if err != nil {
-		fmt.Println("Fail to select DB", err)
-	}
-	defer func(rows *sql.Rows) { //絶対に閉じる
-		err := rows.Close()
-		if err != nil {
-			fmt.Println("Fail to close selecting DB", err)
-		}
-	}(rows)
-
-	var td todo
-	comment := ""
-	count := 1
-	for rows.Next() {
-		err := rows.Scan(&td.id, &td.name, &td.level)
-		if err != nil {
-			fmt.Println(err)
-		}
-		comment += "ID: " + strconv.Itoa(count) + " タスク名: " + td.name + " 優先度: " + td.level + "\n"
-		count += 1
-	}
-	embed := discordgo.MessageEmbed{Title: "ToDoリスト", Description: comment, Color: 1752220}
+	count, embed := SelectDB(db) //一覧表示
 	message, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, "error")
 	}
-	emoji := [...]string{"1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣", "9⃣"}
-	for i := 0; i < count-1; i++ {
-		_ = s.MessageReactionAdd(m.ChannelID, message.ID, emoji[i])
+	for i := 0; i < count; i++ {
+		_ = s.MessageReactionAdd(m.ChannelID, message.ID, emojis.Numbers[i])
 	}
-	_ = s.MessageReactionAdd(m.ChannelID, message.ID, "📝")
+	_ = s.MessageReactionAdd(m.ChannelID, message.ID, emojis.New)
 }
 
 func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
-
 	if m.ChannelID != os.Getenv("Discord-Bot-Todo-ChannelID") { //チャンネル外での発言
 		return
 	}
@@ -121,26 +88,26 @@ func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 		Bot_Message_ID = m.MessageID
 		return
 	}
-	if m.MessageID == Bot_Message_ID {
-		db, err := sql.Open("sqlite3", "todo_database.db") //データベースに接続
-		if err != nil {
-			fmt.Println("Fail to open DB", err)
-		}
-		defer func(db *sql.DB) { //必ず閉じる
-			err := db.Close()
+	if m.MessageID == Bot_Message_ID { //絵文字を押した時に削除か更新か選びたい
+		name := m.Emoji.Name
+		switch name {
+		case emojis.New: //登録
+			flag_new = 1
+			s.ChannelMessageSend(m.ChannelID, "登録したいタスクを言ってね(例:部屋の掃除 9)")
+		default:
+			db := OpenDB()    //DBを起動
+			defer CloseDB(db) //DBは必ず閉じる
+			DeleteDB(db, name)
+			s.ChannelMessageSend(m.ChannelID, "削除したよ!")
+			count, embed := SelectDB(db) //一覧表示
+			message, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 			if err != nil {
-				fmt.Println("Fail to close DB", err)
+				s.ChannelMessageSend(m.ChannelID, "error")
 			}
-		}(db) //データベースの接続解除
-
-		fmt.Println(m.Emoji.Name)
-		fmt.Println(m.Emoji.ID)
-		//絵文字を押した時に削除か更新か選びたい
-		cmd := "DELETE FROM todo WHERE id = (select id from todo limit 1 offset ?-1)"
-		_, err = db.Exec(cmd, m.Emoji.Name)
-		if err != nil {
-			fmt.Println("Fail to delete DB", err)
+			for i := 0; i < count; i++ {
+				_ = s.MessageReactionAdd(m.ChannelID, message.ID, emojis.Numbers[i])
+			}
+			_ = s.MessageReactionAdd(m.ChannelID, message.ID, emojis.New)
 		}
-		s.ChannelMessageSend(m.ChannelID, "削除したよ")
 	}
 }

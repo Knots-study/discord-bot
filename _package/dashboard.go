@@ -24,8 +24,8 @@ func MakeDashboard(session *discordgo.Session, message *discordgo.MessageCreate,
 }
 
 func (ds *Dashboard) Reload() {
-	var fields []*discordgo.MessageEmbedField
-	
+	//var fields []*discordgo.MessageEmbedField
+
 	embed := discordgo.MessageEmbed{
 		Type:        discordgo.EmbedType("rich"),
 		Title:       ds.title,
@@ -39,7 +39,7 @@ func (ds *Dashboard) Reload() {
 func (ds *Dashboard) Renew() {
 	err := ds.session.ChannelMessageDelete(ds.channelID, ds.messageID)
 	if err != nil {
-		Log.Err(err)
+		//Log.Err(err)
 	}
 	ds.messageID = ""
 	ds.Reload()
