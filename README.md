@@ -2,7 +2,8 @@
 Todoリスト用のbot
 
 ## future-work
-- データの一覧表示(ダッシュボード化)
-- スラッシュコマンド実装
+- ~~データの一覧表示(ダッシュボード化)~~
 - 優先度によって計算された時間に通知
-- awsを使ったmysql(Amazon RDS for MySQL)
+　⇒EC2上でプログラムを管理する
+- DBの管理方法(sqlite⇒mysql)
+  ⇒Amazon RDSを使いたみある
