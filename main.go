@@ -46,7 +46,7 @@ func main() {
 }
 
 func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if m.ChannelID != os.Getenv("Discord-Bot-Todo-ChannelID") { //チャンネル外での発言
+	if m.ChannelID != os.Getenv("Discord_Bot_Todo_ChannelID") { //チャンネル外での発言
 		return
 	}
 	if m.Author.ID == s.State.User.ID { //本人の発言
@@ -81,7 +81,7 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
-	if m.ChannelID != os.Getenv("Discord-Bot-Todo-ChannelID") { //チャンネル外での発言
+	if m.ChannelID != os.Getenv("Discord_Bot_Todo_ChannelID") { //チャンネル外での発言
 		return
 	}
 	if m.UserID == s.State.User.ID {
