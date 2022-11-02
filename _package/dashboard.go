@@ -5,6 +5,10 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+/*
+ダッシュボードを管理するためのパッケージ(実装中)
+*/
+
 type Dashboard struct {
 	title       string
 	description string

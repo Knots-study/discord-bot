@@ -98,7 +98,9 @@ func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 			db := OpenDB()    //DBを起動
 			defer CloseDB(db) //DBは必ず閉じる
 			DeleteDB(db, name)
-			s.ChannelMessageSend(m.ChannelID, "削除したよ!")
+			s.ChannelMessageSend(m.ChannelID, "削除したよ")
+			//UpdateDB(db, name)　//updateをすると，通知時間を計算し直す必要がある為，一旦保留
+
 			count, embed := SelectDB(db) //一覧表示
 			message, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 			if err != nil {

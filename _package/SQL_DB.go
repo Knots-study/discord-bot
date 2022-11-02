@@ -83,13 +83,13 @@ func DeleteDB(db *sql.DB, Name string) {
 	}
 }
 
-//func UpdateDB(db *sql.DB, Name string) {
-//	cmd := "UPDATE todo SET level = ? WHERE name = ?"
-//	_, err := db.Exec(cmd, Name)
-//	if err != nil {
-//		fmt.Println("Fail to delete DB", err)
-//	}
-//}
+func UpdateDB(db *sql.DB, Name string) { //一旦保留した関数
+	cmd := "UPDATE todo SET level = ? WHERE name = (select name from todo limit 1 offset ?-1)"
+	_, err := db.Exec(cmd, Name)
+	if err != nil {
+		fmt.Println("Fail to delete DB", err)
+	}
+}
 
 func OpenDB() *sql.DB {
 	db, err := sql.Open("sqlite3", "todo_database.db") //データベースに接続
