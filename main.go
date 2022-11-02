@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	Token          = "Bot " + os.Getenv("Discord-Bot-Token")
+	Token          = "Bot " + os.Getenv("Discord_Bot_Token")
 	Bot_Message_ID = ""
 	emojis         = InitEmojis()
 	flag_new       = 0
