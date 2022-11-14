@@ -60,9 +60,9 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	if flag_new == 1 { //Newボタンが押された時のみ，値を追加する
 		arr := strings.Split(m.Content, " ")
-		if len(arr) != 2 {
+		if len(arr) != 3 {
 			s.ChannelMessageSend(m.ChannelID, "きちんと入力してください")
-			s.ChannelMessageSend(m.ChannelID, "登録したいタスクを言ってね(例:部屋の掃除 9)")
+			s.ChannelMessageSend(m.ChannelID, "登録したいタスクを言ってね(例:部屋の掃除 2022/5/8/23:45 5)")
 			return
 		}
 		InsertDB(arr, db)
@@ -93,7 +93,7 @@ func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 		switch name {
 		case emojis.New: //登録
 			flag_new = 1
-			s.ChannelMessageSend(m.ChannelID, "登録したいタスクを言ってね(例:部屋の掃除 9)")
+			s.ChannelMessageSend(m.ChannelID, "登録したいタスクを言ってね(例:部屋の掃除 2022/5/8/23:45 5)")
 		default:
 			db := OpenDB()    //DBを起動
 			defer CloseDB(db) //DBは必ず閉じる

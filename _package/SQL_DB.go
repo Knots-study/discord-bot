@@ -15,9 +15,16 @@ var (
 	flag_new = 0
 )
 
-type todo struct {
-	name  string
-	level string
+type Todo struct {
+	id       int
+	name     string
+	deadline string
+	level    int
+}
+
+type TodoNotice struct {
+	Todo
+	noticeTime int
 }
 
 func CreateDB() {
@@ -32,23 +39,33 @@ func CreateDB() {
 		}
 	}(db) //データベースの接続解除
 
-	cmd := "CREATE TABLE IF NOT EXISTS todo (name text primary key, level text)" //AUTOINCREMENT制約(セキュリティ的にヤバめ，どうするか)
+	cmd := "CREATE TABLE IF NOT EXISTS Todo (id integer primary key, deadline text, name text, level text)"
 	_, err = db.Exec(cmd)
 	if err != nil {
 		fmt.Println("Fail to create DB", err)
 	}
+	cmd = "CREATE TABLE IF NOT EXISTS TodoNotice (id integer primary key, noticeTime integer, name text)" //通知用のデータベース
+	_, err = db.Exec(cmd)
+	if err != nil {
+		fmt.Println("Fail to create DB(todo_notice)", err)
+	}
 }
 
 func InsertDB(words []string, db *sql.DB) {
-	cmd := "INSERT INTO todo (name, level) VALUES (?, ?)"
-	_, err := db.Exec(cmd, words[0], words[1])
+	cmd := "INSERT INTO Todo (id, deadline, name, level) VALUES (?, ?, ?, ?)"
+	_, err := db.Exec(cmd, nil, words[0], words[1], words[2])
 	if err != nil {
 		fmt.Println("Fail to insert DB", err)
+	}
+	cmd = "INSERT INTO TodoNotice (id, noticeTime, name) VALUES (?, ?, ?)"
+	var PushTime = CalcTime(words[1], words[2])
+	for _, tm := range PushTime {
+		_, err = db.Exec(cmd, nil, words[0], tm, words[2])
 	}
 }
 
 func SelectDB(db *sql.DB) (int, discordgo.MessageEmbed) {
-	cmd := "SELECT * FROM todo"
+	cmd := "SELECT * FROM Todo"
 	rows, err := db.Query(cmd) //複数の検索結果を取得するため，Query
 	if err != nil {
 		fmt.Println("Fail to select DB", err)
@@ -60,15 +77,15 @@ func SelectDB(db *sql.DB) (int, discordgo.MessageEmbed) {
 		}
 	}(rows)
 
-	td := new(todo)
+	td := new(Todo)
 	comment := ""
 	count := 0
 	for rows.Next() {
-		err := rows.Scan(&td.name, &td.level)
+		err := rows.Scan(&td.id, &td.name, &td.deadline, &td.level)
 		if err != nil {
 			fmt.Println(err)
 		}
-		comment += emojis.Numbers[count] + " タスク名: " + td.name + " 優先度: " + td.level + "\n"
+		comment += emojis.Numbers[count] + " タスク名: " + td.name + " 優先度: " + td.deadline + "\n"
 		count += 1
 	}
 	embed := discordgo.MessageEmbed{Title: "ToDoリスト(※10個まで登録可)", Description: comment, Color: 1752220}
@@ -83,7 +100,7 @@ func DeleteDB(db *sql.DB, Name string) {
 	}
 }
 
-func UpdateDB(db *sql.DB, Name string) { //一旦保留した関数
+func UpdateDB(db *sql.DB, Name string) { //一旦保留した関数(後で作る)
 	cmd := "UPDATE todo SET level = ? WHERE name = (select name from todo limit 1 offset ?-1)"
 	_, err := db.Exec(cmd, Name)
 	if err != nil {
