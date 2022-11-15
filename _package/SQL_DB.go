@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
+	"time"
 )
 
 /*
@@ -66,8 +67,14 @@ func InsertDB(words []string, db *sql.DB) {
 }
 
 func SelectDB(db *sql.DB) (int, discordgo.MessageEmbed) {
-	cmd := "SELECT * FROM Todo order by UnixDead" // 残り時間が少ないタスクを上に表示させる
-	rows, err := db.Query(cmd)                    //複数の検索結果を取得するため，Query
+	cmd := "DELETE FROM Todo WHERE UnixDead < ?" //締め切りが過ぎたタスクを自動削除
+	_, err := db.Exec(cmd, int(time.Now().Unix()))
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	cmd = "SELECT * FROM Todo order by UnixDead" // 残り時間が少ないタスクを上に表示させる
+	rows, err := db.Query(cmd)                   //複数の検索結果を取得するため，Query
 	if err != nil {
 		fmt.Println("Fail to select DB", err)
 	}
@@ -87,15 +94,15 @@ func SelectDB(db *sql.DB) (int, discordgo.MessageEmbed) {
 			fmt.Println(err)
 		}
 		comment += emojis.Numbers[count] + " タスク名: " + td.name + " 締め切り: " + td.deadline + " 優先度: " + td.level + "\n"
-		fmt.Println(td.UnixDead)
 		count += 1
 	}
 	embed := discordgo.MessageEmbed{Title: "ToDoリスト(※10個まで登録可)", Description: comment, Color: 1752220}
 	return count, embed
 }
 
-func DeleteDB(db *sql.DB, Name string) {
-	cmd := "DELETE FROM todo WHERE name = (select name from todo limit 1 offset ?-1)"
+func DeleteStampDB(db *sql.DB, Name string) {
+	cmd := "DELETE FROM todo WHERE name = (select name from todo limit 1 offset ?-1)" //バグはココ
+	fmt.Println(Name)
 	_, err := db.Exec(cmd, Name)
 	if err != nil {
 		fmt.Println("Fail to delete DB", err)

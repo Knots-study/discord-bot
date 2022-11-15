@@ -97,7 +97,7 @@ func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 		default:
 			db := OpenDB()    //DBを起動
 			defer CloseDB(db) //DBは必ず閉じる
-			DeleteDB(db, name)
+			DeleteStampDB(db, name)
 			s.ChannelMessageSend(m.ChannelID, "削除したよ")
 			//UpdateDB(db, name)　//updateをすると，通知時間を計算し直す必要がある為，一旦保留
 
