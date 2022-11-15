@@ -19,7 +19,8 @@ type Todo struct {
 	id       int
 	name     string
 	deadline string
-	level    int
+	level    string
+	UnixDead int
 }
 
 type TodoNotice struct {
@@ -39,7 +40,7 @@ func CreateDB() {
 		}
 	}(db) //データベースの接続解除
 
-	cmd := "CREATE TABLE IF NOT EXISTS Todo (id integer primary key, deadline text, name text, level text)"
+	cmd := "CREATE TABLE IF NOT EXISTS Todo (id integer primary key, name text, deadline text, level text, UnixDead int)"
 	_, err = db.Exec(cmd)
 	if err != nil {
 		fmt.Println("Fail to create DB", err)
@@ -52,21 +53,21 @@ func CreateDB() {
 }
 
 func InsertDB(words []string, db *sql.DB) {
-	cmd := "INSERT INTO Todo (id, deadline, name, level) VALUES (?, ?, ?, ?)"
-	_, err := db.Exec(cmd, nil, words[0], words[1], words[2])
+	cmd := "INSERT INTO Todo (id, name, deadline, level, UnixDead) VALUES (?, ?, ?, ?, ?)"
+	_, err := db.Exec(cmd, nil, words[0], words[1], words[2], CalcTime(words[1]))
 	if err != nil {
 		fmt.Println("Fail to insert DB", err)
 	}
 	cmd = "INSERT INTO TodoNotice (id, noticeTime, name) VALUES (?, ?, ?)"
-	var PushTime = CalcTime(words[1], words[2])
+	var PushTime = InformCnt(words[1], words[2]) //deadline, level
 	for _, tm := range PushTime {
 		_, err = db.Exec(cmd, nil, words[0], tm, words[2])
 	}
 }
 
 func SelectDB(db *sql.DB) (int, discordgo.MessageEmbed) {
-	cmd := "SELECT * FROM Todo"
-	rows, err := db.Query(cmd) //複数の検索結果を取得するため，Query
+	cmd := "SELECT * FROM Todo order by UnixDead" // 残り時間が少ないタスクを上に表示させる
+	rows, err := db.Query(cmd)                    //複数の検索結果を取得するため，Query
 	if err != nil {
 		fmt.Println("Fail to select DB", err)
 	}
@@ -81,11 +82,12 @@ func SelectDB(db *sql.DB) (int, discordgo.MessageEmbed) {
 	comment := ""
 	count := 0
 	for rows.Next() {
-		err := rows.Scan(&td.id, &td.name, &td.deadline, &td.level)
+		err := rows.Scan(&td.id, &td.name, &td.deadline, &td.level, &td.UnixDead)
 		if err != nil {
 			fmt.Println(err)
 		}
-		comment += emojis.Numbers[count] + " タスク名: " + td.name + " 優先度: " + td.deadline + "\n"
+		comment += emojis.Numbers[count] + " タスク名: " + td.name + " 締め切り: " + td.deadline + " 優先度: " + td.level + "\n"
+		fmt.Println(td.UnixDead)
 		count += 1
 	}
 	embed := discordgo.MessageEmbed{Title: "ToDoリスト(※10個まで登録可)", Description: comment, Color: 1752220}

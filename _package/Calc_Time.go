@@ -7,8 +7,7 @@ import (
 	"time"
 )
 
-func CalcTime(st string, cnt string) []int {
-	NowTime := time.Now().Unix()
+func CalcTime(st string) int {
 	SetTime := regexp.MustCompile("[/:]").Split(st, -1)
 	t := make([]int, 5)
 	for i := 0; i < len(SetTime); i++ {
@@ -16,7 +15,7 @@ func CalcTime(st string, cnt string) []int {
 		t[i] = n
 	}
 	t1 := time.Date(t[0], time.Month(t[1]), t[2], t[3], t[4], 0, 0, Location())
-	return InformCnt(NowTime, t1.Unix(), cnt)
+	return int(t1.Unix())
 }
 
 // Location 東京のタイムゾーンを取得
@@ -25,8 +24,9 @@ func Location() *time.Location {
 }
 
 // InformCnt 優先度によって通知する時間を決定
-func InformCnt(Now int64, info int64, cnt string) []int {
-	TimeRemain := int(info - Now)
+func InformCnt(st string, cnt string) []int {
+	info := CalcTime(st)
+	TimeRemain := info - int(time.Now().Unix())
 	var informTime []int
 	switch cnt {
 	case "1":
@@ -49,7 +49,7 @@ func InformCnt(Now int64, info int64, cnt string) []int {
 	var PushTime []int
 	for _, Tm := range informTime {
 		if TimeRemain > Tm { //残されている時間 > 通知する候補の時間の場合，通知する時間になる
-			PushTime = append(PushTime, int(info)-Tm)
+			PushTime = append(PushTime, info-Tm)
 		}
 	}
 	return PushTime
