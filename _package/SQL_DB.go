@@ -101,7 +101,7 @@ func SelectDB(db *sql.DB) (int, discordgo.MessageEmbed) {
 }
 
 func DeleteStampDB(db *sql.DB, Name string) {
-	cmd := "DELETE FROM todo WHERE name = (select name from todo limit 1 offset ?-1)" //バグはココ
+	cmd := "DELETE FROM todo WHERE id = (select id from todo limit 1 offset ?-1)" //バグはココ
 	fmt.Println(Name)
 	_, err := db.Exec(cmd, Name)
 	if err != nil {
@@ -110,7 +110,7 @@ func DeleteStampDB(db *sql.DB, Name string) {
 }
 
 func UpdateDB(db *sql.DB, Name string) { //一旦保留した関数(後で作る)
-	cmd := "UPDATE todo SET level = ? WHERE name = (select name from todo limit 1 offset ?-1)"
+	cmd := "UPDATE todo SET level = ? WHERE id = (select id from todo limit 1 offset ?-1)"
 	_, err := db.Exec(cmd, Name)
 	if err != nil {
 		fmt.Println("Fail to delete DB", err)
