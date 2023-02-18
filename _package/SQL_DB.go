@@ -55,7 +55,7 @@ func CreateDB() {
 
 func InsertDB(words []string, db *sql.DB) {
 	cmd := "INSERT INTO Todo (id, name, deadline, level, UnixDead) VALUES (?, ?, ?, ?, ?)"
-	_, err := db.Exec(cmd, nil, words[0], words[1], words[2], CalcTime(words[1]))
+	_, err := db.Exec(cmd, nil, words[0], words[1], words[2], CalcTime(words[1])) //deadlineからUnixdeadを計算
 	if err != nil {
 		fmt.Println("Fail to insert DB", err)
 	}
