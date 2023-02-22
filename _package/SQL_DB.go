@@ -4,6 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
+	"github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
+	"os"
 	"time"
 )
 
@@ -29,37 +32,52 @@ type TodoNotice struct {
 	noticeTime int
 }
 
-func CreateDB() {
-	db, err := sql.Open("sqlite3", "todo_database.db") //データベースに接続
+func ConnectDB() *sql.DB {
+	err := godotenv.Load(".env")
+	if err != nil {
+		fmt.Println("環境変数が読み込めませんでした")
+	}
+	jst, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		fmt.Println("error to Connect DB", err)
+	}
+	c := mysql.Config{
+		DBName:    os.Getenv("MYSQL_DATABASE"),
+		User:      os.Getenv("MYSQL_USER"),
+		Passwd:    os.Getenv("MYSQL_PASSWORD"),
+		Addr:      "localhost:3306",
+		Net:       "tcp",
+		ParseTime: true,
+		Collation: "utf8mb4_unicode_ci",
+		Loc:       jst,
+	}
+
+	db, err := sql.Open("mysql", c.FormatDSN())
 	if err != nil {
 		fmt.Println("Fail to open DB", err)
 	}
-	defer func(db *sql.DB) { //必ず閉じる
-		err := db.Close()
-		if err != nil {
-			fmt.Println("Fail to close DB", err)
-		}
-	}(db) //データベースの接続解除
 
-	cmd := "CREATE TABLE IF NOT EXISTS Todo (id integer primary key, name text, deadline text, level text, UnixDead int)"
+	// テーブルがない場合，作成する
+	cmd := "CREATE TABLE IF NOT EXISTS todobot.Todo (id integer AUTO_INCREMENT, name text, deadline text, level text, UnixDead int, primary key(id))"
 	_, err = db.Exec(cmd)
 	if err != nil {
 		fmt.Println("Fail to create DB", err)
 	}
-	cmd = "CREATE TABLE IF NOT EXISTS TodoNotice (id integer primary key, noticeTime integer, name text)" //通知用のデータベース
+	cmd = "CREATE TABLE IF NOT EXISTS todobot.TodoNotice (id integer AUTO_INCREMENT, noticeTime integer, name text, primary key(id))" //通知用のデータベース
 	_, err = db.Exec(cmd)
 	if err != nil {
 		fmt.Println("Fail to create DB(todo_notice)", err)
 	}
+	return db
 }
 
 func InsertDB(words []string, db *sql.DB) {
-	cmd := "INSERT INTO Todo (id, name, deadline, level, UnixDead) VALUES (?, ?, ?, ?, ?)"
+	cmd := "INSERT INTO todobot.Todo (id, name, deadline, level, UnixDead) VALUES (?, ?, ?, ?, ?)"
 	_, err := db.Exec(cmd, nil, words[0], words[1], words[2], CalcTime(words[1])) //deadlineからUnixdeadを計算
 	if err != nil {
 		fmt.Println("Fail to insert DB", err)
 	}
-	cmd = "INSERT INTO TodoNotice (id, noticeTime, name) VALUES (?, ?, ?)"
+	cmd = "INSERT INTO todobot.TodoNotice (id, noticeTime, name) VALUES (?, ?, ?)"
 	var PushTime = InformCnt(words[1], words[2]) //deadline, level
 	for _, tm := range PushTime {
 		_, err = db.Exec(cmd, nil, words[0], tm, words[2])
@@ -67,14 +85,14 @@ func InsertDB(words []string, db *sql.DB) {
 }
 
 func SelectDB(db *sql.DB) (int, discordgo.MessageEmbed) {
-	cmd := "DELETE FROM Todo WHERE UnixDead < ?" //締め切りが過ぎたタスクを自動削除
+	cmd := "DELETE FROM todobot.Todo WHERE UnixDead < ?" //締め切りが過ぎたタスクを自動削除
 	_, err := db.Exec(cmd, int(time.Now().Unix()))
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Fail to Delete contents", err)
 	}
 
-	cmd = "SELECT * FROM Todo order by UnixDead" // 残り時間が少ないタスクを上に表示させる
-	rows, err := db.Query(cmd)                   //複数の検索結果を取得するため，Query
+	cmd = "SELECT * FROM todobot.Todo order by UnixDead" // 残り時間が少ないタスクを上に表示させる
+	rows, err := db.Query(cmd)                           //複数の検索結果を取得するため，Query
 	if err != nil {
 		fmt.Println("Fail to select DB", err)
 	}
@@ -101,7 +119,7 @@ func SelectDB(db *sql.DB) (int, discordgo.MessageEmbed) {
 }
 
 func DeleteStampDB(db *sql.DB, Name string) {
-	cmd := "DELETE FROM todo WHERE id = (select id from todo limit 1 offset ?-1)" //バグはココ
+	cmd := "DELETE FROM todobot.Todo WHERE id = (select id from ( select id from todobot.Todo limit 1 offset ?) temp)"
 	fmt.Println(Name)
 	_, err := db.Exec(cmd, Name)
 	if err != nil {
@@ -110,19 +128,11 @@ func DeleteStampDB(db *sql.DB, Name string) {
 }
 
 func UpdateDB(db *sql.DB, Name string) { //一旦保留した関数(後で作る)
-	cmd := "UPDATE todo SET level = ? WHERE id = (select id from todo limit 1 offset ?-1)"
+	cmd := "UPDATE todobot.Todo SET level = ? WHERE id = (select id from todobot.Todo limit 1 offset ?)" // サブクエリのfrom句と最新のターゲットが両方同じテーブルを指定するとエラー(上のように書く)
 	_, err := db.Exec(cmd, Name)
 	if err != nil {
 		fmt.Println("Fail to delete DB", err)
 	}
-}
-
-func OpenDB() *sql.DB {
-	db, err := sql.Open("sqlite3", "todo_database.db") //データベースに接続
-	if err != nil {
-		fmt.Println("Fail to open DB", err)
-	}
-	return db
 }
 
 func CloseDB(db *sql.DB) {

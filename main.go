@@ -53,10 +53,7 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	db := OpenDB()    //DBを起動
-	defer CloseDB(db) //DBは必ず閉じる
-
-	CreateDB() //起動時にDBのテーブルが未作成の場合，作成する
+	db := ConnectDB()
 
 	if flag_new == 1 { //Newボタンが押された時のみ，値を追加する
 		arr := strings.Split(m.Content, " ")
@@ -95,7 +92,7 @@ func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 			flag_new = 1
 			s.ChannelMessageSend(m.ChannelID, "登録したいタスクを言ってね(例:部屋の掃除 2022/5/8/23:45 5)")
 		default:
-			db := OpenDB()    //DBを起動
+			db := ConnectDB() //DBを起動
 			defer CloseDB(db) //DBは必ず閉じる
 			DeleteStampDB(db, name)
 			s.ChannelMessageSend(m.ChannelID, "削除したよ")
